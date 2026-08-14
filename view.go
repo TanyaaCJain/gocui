@@ -444,32 +444,26 @@ func (v *View) parseInput(ch rune) []cell {
 
 	isEscape, err := v.ei.parseOne(ch)
 	if err != nil {
-		for _, r := range v.ei.runes() {
-			c := cell{
-				fgColor: v.FgColor,
-				bgColor: v.BgColor,
-				chr:     r,
-			}
-			cells = append(cells, c)
-		}
+		// Drop malformed sequences instead of emitting raw ESC bytes.
 		v.ei.reset()
-	} else {
-		if isEscape {
-			return nil
+		return cells
+	}
+
+	if isEscape {
+		return nil
+	}
+	repeatCount := 1
+	if ch == '\t' {
+		ch = ' '
+		repeatCount = 4
+	}
+	for i := 0; i < repeatCount; i++ {
+		c := cell{
+			fgColor: v.ei.curFgColor,
+			bgColor: v.ei.curBgColor,
+			chr:     ch,
 		}
-		repeatCount := 1
-		if ch == '\t' {
-			ch = ' '
-			repeatCount = 4
-		}
-		for i := 0; i < repeatCount; i++ {
-			c := cell{
-				fgColor: v.ei.curFgColor,
-				bgColor: v.ei.curBgColor,
-				chr:     ch,
-			}
-			cells = append(cells, c)
-		}
+		cells = append(cells, c)
 	}
 
 	return cells
