@@ -266,6 +266,13 @@ func (g *Gui) Views() []*View {
 	return g.views
 }
 
+// TaintAll marks all views tainted, forcing a full repaint on the next flush.
+func (g *Gui) TaintAll() {
+	for _, v := range g.views {
+		v.tainted = true
+	}
+}
+
 // View returns a pointer to the view with the given name, or error
 // ErrUnknownView if a view with that name does not exist.
 func (g *Gui) View(name string) (*View, error) {

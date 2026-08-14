@@ -5,35 +5,49 @@
 package gocui
 
 import (
+	"sync"
+
 	"github.com/gdamore/tcell/v2"
 )
 
-var screen tcell.Screen
+var (
+	screen   tcell.Screen
+	screenMu sync.RWMutex
+)
 
 // tcellInit initializes tcell screen for use.
 func tcellInit() error {
-	if s, e := tcell.NewScreen(); e != nil {
+	s, e := tcell.NewScreen()
+	if e != nil {
 		return e
-	} else if e = s.Init(); e != nil {
+	}
+	if e = s.Init(); e != nil {
 		return e
-	} else {
-		screen = s
-		return nil
+	}
+	screenMu.Lock()
+	screen = s
+	screenMu.Unlock()
+	return nil
+}
+
+// Suspend fully finalizes the tcell screen so another terminal app can take over the TTY.
+func Suspend() {
+	screenMu.RLock()
+	current := screen
+	screenMu.RUnlock()
+	if current != nil {
+		current.Fini()
 	}
 }
 
-// Suspend closes the tcell screen allowing other terminal apps to run
-func Suspend() {
-	screen.Fini()
-}
-
-// Resume re-initializes the tcell screen, intended to be used after "Suspend" has been called
+// Resume re-initializes a fresh tcell screen after Suspend.
 func Resume() error {
-    if e := tcellInit(); e != nil {
-        return e
-    }
-    screen.EnableMouse()
-    return nil
+	if err := tcellInit(); err != nil {
+		return err
+	}
+	screen.EnableMouse()
+	screen.Sync()
+	return nil
 }
 
 // tcellInitSimulation creates a tcell simulated screen for testing
@@ -41,11 +55,12 @@ func tcellInitSimulation() error {
 	simScreen := tcell.NewSimulationScreen("UTF-8")
 	if e := simScreen.Init(); e != nil {
 		return e
-	} else {
-		screen = simScreen.(tcell.Screen)
-		simulationScreen = simScreen
-		return nil
 	}
+	screenMu.Lock()
+	screen = simScreen.(tcell.Screen)
+	screenMu.Unlock()
+	simulationScreen = simScreen
+	return nil
 }
 
 // tcellSetCell sets the character cell at a given location to the given
@@ -138,7 +153,13 @@ var (
 
 // pollEvent get tcell.Event and transform it into gocuiEvent
 func pollEvent() gocuiEvent {
-	tev := screen.PollEvent()
+	screenMu.RLock()
+	current := screen
+	screenMu.RUnlock()
+	if current == nil {
+		return gocuiEvent{Type: eventNone}
+	}
+	tev := current.PollEvent()
 	switch tev := tev.(type) {
 	case *tcell.EventInterrupt:
 		return gocuiEvent{Type: eventInterrupt}

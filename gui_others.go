@@ -55,3 +55,33 @@ func (g *Gui) getTermWindowSize() (int, int, error) {
 
 	}
 }
+
+// RestoreTermSize re-asserts the terminal size after a full-screen child
+// process such as tmux has taken over.
+func RestoreTermSize(cols, rows int) {
+	if cols <= 0 || rows <= 0 {
+		return
+	}
+	out, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+	if err != nil {
+		return
+	}
+	defer out.Close()
+
+	sz := struct {
+		rows uint16
+		cols uint16
+		_    [2]uint16
+	}{
+		rows: uint16(rows),
+		cols: uint16(cols),
+	}
+	_, _, _ = syscall.Syscall(syscall.SYS_IOCTL, out.Fd(), uintptr(syscall.TIOCSWINSZ), uintptr(unsafe.Pointer(&sz)))
+
+	screenMu.RLock()
+	current := screen
+	screenMu.RUnlock()
+	if current != nil {
+		current.Sync()
+	}
+}
