@@ -806,8 +806,12 @@ func (g *Gui) drawTitle(v *View, fgColor, bgColor Attribute) error {
 		return nil
 	}
 
-	for i, ch := range v.Title {
+	// Iterate runes, not bytes — multi-byte runes (e.g. box-drawing ─ in
+	// titles) must advance one column each, not three.
+	i := 0
+	for _, ch := range v.Title {
 		x := v.x0 + i + 2
+		i++
 		if x < 0 {
 			continue
 		} else if x > v.x1-2 || x >= g.maxX {
