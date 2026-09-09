@@ -1,0 +1,30 @@
+name: auto-tag omua fork
+
+# Every push to master bumps v1.1.0-omua.N — the tag omua's go.mod consumes.
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write # push the new tag
+
+jobs:
+  tag:
+    if: startsWith(github.event.head_commit.message, 'fix') || startsWith(github.event.head_commit.message, 'feat') || startsWith(github.event.head_commit.message, 'patch')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need existing tags to compute the next one
+
+      - name: bump v1.1.0-omua.N
+        run: |
+          latest=$(git tag -l 'v1.1.0-omua.*' --sort=-v:refname | head -1)
+          if [ -z "$latest" ]; then
+            next="v1.1.0-omua.1"
+          else
+            next="v1.1.0-omua.$(( ${latest##*.} + 1 ))"
+          fi
+          git tag "$next"
+          git push origin "$next"
+          echo "tagged $next"
